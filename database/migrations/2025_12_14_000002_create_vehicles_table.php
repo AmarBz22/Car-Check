@@ -1,25 +1,40 @@
 <?php
 
-// database/migrations/2025_12_14_000002_create_vehicles_table.php
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-    public function up() {
+    public function up()
+    {
         Schema::create('vehicles', function (Blueprint $table) {
             $table->id();
-            $table->string('chassis', 17)->unique(); // Numéro de châssis / VIN
-            $table->string('brand')->nullable();
-            $table->string('model')->nullable();
-            $table->smallInteger('year')->nullable();
-            $table->string('engine')->nullable();
+
+            // Identification
+            $table->string('plate_number')->unique();     // رقم لوحة السيارة
+            $table->string('vin')->nullable()->unique();  // رقم الهيكل (VIN)
+
+            // Basic info
+            $table->string('brand');        // العلامة التجارية (Peugeot, Toyota...)
+            $table->string('model');        // الموديل (208, Corolla...)
+            $table->year('year');           // سنة الصنع
+            $table->string('color')->nullable(); // اللون
+
+            // Status & source
+            $table->enum('status', ['pending', 'verified', 'rejected'])
+                  ->default('pending');     // حالة التحقق
+            $table->foreignId('verified_by')
+                  ->nullable()
+                  ->constrained('users')
+                  ->nullOnDelete();          // الشخص الذي تحقق من السيارة
+
+            // Metadata
             $table->timestamps();
         });
     }
 
-    public function down() {
+    public function down()
+    {
         Schema::dropIfExists('vehicles');
     }
 };

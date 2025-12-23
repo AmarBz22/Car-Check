@@ -2,7 +2,9 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\PaymentController;
+
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -20,5 +22,11 @@ Route::middleware(['auth:sanctum', 'role:admin,source'])->group(function () {
 // Listing and showing vehicles can still be for any authenticated user
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/vehicles', [VehicleController::class, 'index']);
-    Route::get('/vehicles/{id}', [VehicleController::class, 'show']);
+    Route::get('/vehicles/{id}', [VehicleController::class, 'show']);      
 });
+
+ Route::post('/payments/create', [PaymentController::class, 'createPayment']);
+        
+
+Route::post('/payments/webhook', [PaymentController::class, 'webhook'])
+    ->name('chargily.webhook');        

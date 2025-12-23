@@ -2,15 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, Notifiable;
 
+    /**
+     * Mass assignable attributes
+     */
     protected $fillable = [
         'name',
         'email',
@@ -18,21 +21,52 @@ class User extends Authenticatable
         'role',
     ];
 
+    /**
+     * Hidden attributes when returning JSON
+     */
     protected $hidden = [
         'password',
-        'remember_token',
+       
     ];
 
-    protected function casts(): array
+    /**
+     * Attribute casting
+     */
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+    ];
+
+    /* =========================
+       Role helpers
+       ========================= */
+
+    public function isAdmin(): bool
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        return $this->role === 'admin';
     }
 
-    // Role helpers
-    public function isAdmin() { return $this->role === 'admin'; }
-    public function isClient() { return $this->role === 'client'; }
-    public function isSource() { return $this->role === 'source'; }
+    public function isSource(): bool
+    {
+        return $this->role === 'source';
+    }
+
+    public function isClient(): bool
+    {
+        return $this->role === 'client';
+    }
+      public function isVerified(): bool
+    {
+        return !is_null($this->email_verified_at);
+    }
+    
+    /* =========================
+       Relationships (later)
+       ========================= */
+
+       public function payments() {
+    return $this->hasMany(Payment::class);
+}
+
+    // public function purchases() {}
+    // public function reports() {}
 }

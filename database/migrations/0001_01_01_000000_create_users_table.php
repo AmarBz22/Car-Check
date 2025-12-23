@@ -8,14 +8,22 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up() {
-        Schema::create('users', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->string('password');
-            $table->string('role')->default('client'); // admin, source, client
-            $table->timestamps();
-        });
+    Schema::create('users', function (Blueprint $table) {
+    $table->id();
+
+    // Identity
+    $table->string('name', 150);
+    $table->string('email', 150)->unique();
+    $table->timestamp('email_verified_at')->nullable();
+    $table->string('password');
+
+    // Role & Status
+    $table->enum('role', ['admin', 'partner', 'client'])->default('client');
+    $table->enum('status', ['active', 'suspended'])->default('active');
+    
+
+    $table->timestamps();
+});
     }
 
     public function down() {
