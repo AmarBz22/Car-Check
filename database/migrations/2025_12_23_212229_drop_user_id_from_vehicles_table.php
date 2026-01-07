@@ -9,16 +9,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('vehicles', function (Blueprint $table) {
-            // Add user_id column and foreign key
-            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
+            $table->dropForeign(['user_id']); // drop foreign key first
+            $table->dropColumn('user_id');    // then drop column
         });
     }
 
     public function down(): void
     {
         Schema::table('vehicles', function (Blueprint $table) {
-            $table->dropForeign(['user_id']);
-            $table->dropColumn('user_id');
+            $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
         });
     }
 };

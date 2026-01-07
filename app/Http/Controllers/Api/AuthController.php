@@ -11,29 +11,30 @@ use App\Models\User;
 class AuthController extends Controller
 {
     // REGISTER
-    public function register(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6|confirmed',
-            'role' => 'required|in:admin,client,source',
-        ]);
+public function register(Request $request)
+{
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|unique:users,email',
+        'password' => 'required|string|min:6|confirmed',
+        'role' => 'required|in:client,source', // 🚫 admin blocked
+    ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => bcrypt($request->password),
-            'role' => $request->role,
-        ]);
+    $user = User::create([
+        'name' => $request->name,
+        'email' => $request->email,
+        'password' => bcrypt($request->password),
+        'role' => $request->role,
+    ]);
 
-        $token = $user->createToken('api-token')->plainTextToken;
+    $token = $user->createToken('api-token')->plainTextToken;
 
-        return response()->json([
-            'user' => $user,
-            'token' => $token
-        ], 201);
-    }
+    return response()->json([
+        'user' => $user,
+        'token' => $token
+    ], 201);
+}
+
 
     // LOGIN
     public function login(Request $request)
@@ -66,4 +67,36 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'Logged out successfully']);
     }
+
+    public function registerAdmin(Request $request)
+{
+    // 🔐 Temporary secret protection
+    if ($request->header('X-ADMIN-SECRET') !== env('ADMIN_SECRET')) {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|unique:users,email',
+        'password' => 'required|string|min:6|confirmed',
+    ]);
+
+    $admin = User::create([
+        'name' => $request->name,
+        'email' => $request->email,
+        'password' => bcrypt($request->password),
+        'role' => 'admin',
+    ]);
+
+    $token = $admin->createToken('api-token')->plainTextToken;
+
+    return response()->json([
+        'message' => 'Admin registered successfully',
+        'user' => $admin,
+        'token' => $token
+    ], 201);
 }
+
+}
+
+

@@ -35,4 +35,10 @@ public function payments() {
 
 
 }
+
+public function images()
+{
+    return $this->hasMany(VehicleImage::class);
+}
+
 }
