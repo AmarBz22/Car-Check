@@ -9,11 +9,11 @@ class Partner extends Authenticatable
 {
     protected $table = 'users'; // same table as User
 
-    // Only include users with role = 'source'
+    // Only include users with role = 'partner'
     protected static function booted()
     {
-        static::addGlobalScope('source', function (Builder $builder) {
-            $builder->where('role', 'source');
+        static::addGlobalScope('partner', function (Builder $builder) {
+            $builder->where('role', 'partner');
         });
     }
 
@@ -22,7 +22,7 @@ class Partner extends Authenticatable
         'name',
         'email',
         'password',
-        'role', // will always be 'source'
+        'role', // will always be 'partner'
     ];
 
     protected $hidden = [
@@ -38,7 +38,7 @@ class Partner extends Authenticatable
     // Helper method
     public function isPartner(): bool
     {
-        return $this->role === 'source';
+        return $this->role === 'partner';
     }
 
 

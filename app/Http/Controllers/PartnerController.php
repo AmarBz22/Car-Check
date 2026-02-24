@@ -40,7 +40,7 @@ class PartnerController extends Controller
             'password' => 'required|string|min:6|confirmed',
         ]);
 
-        $data['role'] = 'source'; // force role
+        $data['role'] = 'partner'; // force role
         $data['password'] = Hash::make($data['password']);
 
         $partner = Partner::create($data);

@@ -43,7 +43,7 @@ class ReportController extends Controller
     // Create a new report for a vehicle
    public function store(Request $request)
 {
-    if (!$request->user()->isSource()) {
+    if (!$request->user()->isPartner()) {
         return response()->json(['message' => 'Unauthorized'], 403);
     }
 
@@ -66,7 +66,7 @@ class ReportController extends Controller
 
 public function verify(Request $request, Report $report)
 {
-   
+
 
     if ($report->status === 'verified') {
         return response()->json(['message' => 'Report already verified'], 400);

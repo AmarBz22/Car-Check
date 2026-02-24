@@ -19,6 +19,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'password',
         'role',
+        'status',
     ];
 
     /**
@@ -26,7 +27,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     protected $hidden = [
         'password',
-       
+
     ];
 
     /**
@@ -37,6 +38,23 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     /* =========================
+       Mutators
+       ========================= */
+
+    /**
+     * Hash password on set, but allow null for pending-password users
+     */
+    public function setPasswordAttribute($value)
+    {
+        // Allow null passwords for users who haven't set one yet
+        if ($value === null) {
+            $this->attributes['password'] = null;
+        } else {
+            $this->attributes['password'] = bcrypt($value);
+        }
+    }
+
+    /* =========================
        Role helpers
        ========================= */
 
@@ -45,9 +63,9 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role === 'admin';
     }
 
-    public function isSource(): bool
+    public function isPartner(): bool
     {
-        return $this->role === 'source';
+        return $this->role === 'partner';
     }
 
     public function isClient(): bool
@@ -58,7 +76,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return !is_null($this->email_verified_at);
     }
-    
+
     /* =========================
        Relationships (later)
        ========================= */

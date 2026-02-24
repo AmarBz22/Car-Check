@@ -9,23 +9,53 @@ class Report extends Model
     protected $fillable = [
         'vehicle_id',
         'payment_id',
+        'partner_id',
+        'report_type',
+        'findings',
+        'kilometrage',
         'risk_score',
         'pdf_path',
+        'status',
         'generated_at',
+        'report_date',
     ];
+
+    protected $casts = [
+        'findings' => 'json',
+        'report_date' => 'datetime',
+        'generated_at' => 'datetime',
+    ];
+
+    // Scopes for status
+    public function scopePending($query)
+    {
+        return $query->where('status', 'submitted');
+    }
+
+    public function scopeApproved($query)
+    {
+        return $query->where('status', 'approved');
+    }
+
+    public function scopeDraft($query)
+    {
+        return $query->where('status', 'draft');
+    }
 
     public function vehicle()
     {
         return $this->belongsTo(Vehicle::class);
     }
-    public function partner() {
-    return $this->belongsTo(User::class, 'partner_id'); // partner who submitted
+
+    public function partner()
+    {
+        return $this->belongsTo(User::class, 'partner_id');
+    }
+
+    public function payment()
+    {
+        return $this->belongsTo(Payment::class);
+    }
 }
 
-public function payments() {
-    return $this->belongsToMany(Payment::class, 'payment_id');
-}
-
-    
-}
 

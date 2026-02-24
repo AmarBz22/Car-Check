@@ -15,12 +15,12 @@ return new class extends Migration {
     $table->string('name', 150);
     $table->string('email', 150)->unique();
     $table->timestamp('email_verified_at')->nullable();
-    $table->string('password');
+    $table->string('password')->nullable();
 
     // Role & Status
     $table->enum('role', ['admin', 'partner', 'client'])->default('client');
-    $table->enum('status', ['active', 'suspended'])->default('active');
-    
+    $table->enum('status', ['active', 'approved', 'suspended'])->default('active');
+
 
     $table->timestamps();
 });
