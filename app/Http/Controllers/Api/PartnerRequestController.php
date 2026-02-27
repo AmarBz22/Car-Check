@@ -84,28 +84,42 @@ public function approveRequest(Request $request, $requestId)
     /**
      * Reject partner registration request (Admin only)
      */
-    public function rejectRequest(Request $request, $requestId)
-    {
-        if (!$request->user()->isAdmin()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+  public function rejectRequest(Request $request, $requestId)
+{
+    // 1. Double-check Authorization (peer-level security)
+    if (!$request->user() || $request->user()->role !== 'admin') {
+        return response()->json(['message' => 'Forbidden: Admins only'], 403);
+    }
 
-        $registrationRequest = RegistrationRequest::findOrFail($requestId);
+    // 2. Wrap in a Transaction for data integrity
+    return \DB::transaction(function () use ($requestId) {
+        
+        // 3. Find with a Lock to prevent "Double-Click" race conditions
+        $registrationRequest = RegistrationRequest::where('id', $requestId)
+            ->lockForUpdate()
+            ->firstOrFail();
 
+        // 4. Validate State
         if ($registrationRequest->status !== 'pending') {
             return response()->json([
-                'message' => 'Request already processed',
-                'status' => $registrationRequest->status
-            ], 400);
+                'message' => 'This request has already been handled.',
+                'current_status' => $registrationRequest->status
+            ], 422);
         }
 
-        $registrationRequest->reject();
+        // 5. Explicitly update the status
+        // This is safer than calling $registrationRequest->reject() 
+        // because it bypasses any potential bugs in that custom method.
+        $registrationRequest->status = 'rejected';
+        $registrationRequest->save();
+
 
         return response()->json([
-            'message' => 'Registration request rejected',
-            'request' => $registrationRequest
-        ]);
-    }
+            'message' => 'Registration request rejected successfully.',
+            'request' => $registrationRequest->fresh() // Return the latest data
+        ], 200);
+    });
+}
 
     /**
      * Get single registration request details (Admin only)
