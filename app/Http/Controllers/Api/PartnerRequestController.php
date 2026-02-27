@@ -93,7 +93,7 @@ public function approveRequest(Request $request, $requestId)
 
     // 2. Wrap in a Transaction for data integrity
     return \DB::transaction(function () use ($requestId) {
-        
+
         // 3. Find with a Lock to prevent "Double-Click" race conditions
         $registrationRequest = RegistrationRequest::where('id', $requestId)
             ->lockForUpdate()
@@ -108,7 +108,7 @@ public function approveRequest(Request $request, $requestId)
         }
 
         // 5. Explicitly update the status
-        // This is safer than calling $registrationRequest->reject() 
+        // This is safer than calling $registrationRequest->reject()
         // because it bypasses any potential bugs in that custom method.
         $registrationRequest->status = 'rejected';
         $registrationRequest->save();
@@ -211,4 +211,32 @@ public function approveRequest(Request $request, $requestId)
             ], 500);
         }
     }
+/**
+ * Get all partners (Any authenticated user)
+ */
+public function getAllPartners(Request $request)
+{
+    $partners = User::where('role', 'partner')
+        ->orderBy('created_at', 'desc')
+        ->paginate(15);
+
+    return response()->json($partners, 200);
+}
+
+/**
+ * Get a specific partner by ID (Any authenticated user)
+ */
+public function getPartnerById(Request $request, $id)
+{
+    $partner = User::where('role', 'partner')
+        ->find($id);
+
+    if (!$partner) {
+        return response()->json([
+            'message' => 'Partner not found'
+        ], 404);
+    }
+
+    return response()->json($partner, 200);
+}
 }

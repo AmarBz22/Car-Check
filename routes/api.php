@@ -75,3 +75,8 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('/admin/reports/{id}/approve', [ReportController::class, 'approveReport']);
     Route::post('/admin/reports/{id}/reject', [ReportController::class, 'rejectReport']);
 });
+// Any authenticated user can view partners
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/partners', [PartnerRequestController::class, 'getAllPartners']);
+    Route::get('/partners/{id}', [PartnerRequestController::class, 'getPartnerById']);
+});
