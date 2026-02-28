@@ -41,28 +41,41 @@ class ReportController extends Controller
 
 
     // Create a new report for a vehicle
-   public function store(Request $request)
+public function store(Request $request)
 {
     if (!$request->user()->isPartner()) {
         return response()->json(['message' => 'Unauthorized'], 403);
     }
 
-    $data = $request->validate([
-        'vehicle_id' => 'required|exists:vehicles,id',
-        'risk_score' => 'nullable|integer|min:0|max:100',
+    $validated = $request->validate([
+        'vehicle_id'           => 'required|exists:vehicles,id',
+        'findings'             => 'required|array',
+        'findings.title'       => 'required|string',
+        'findings.description' => 'required|string',
+        'findings.types'       => 'required|array',
+        'findings.types.*'     => 'in:scanner,mechanic,auto_body_technician',
+        'kilometrage'          => 'nullable|integer|min:0',
+        'risk_score'           => 'nullable|integer|min:0|max:100',
+        'status'               => 'sometimes|in:draft,submitted',
     ]);
 
     $report = Report::create([
-        'vehicle_id'   => $data['vehicle_id'],
-        'risk_score'   => $data['risk_score'] ?? null,
-        'generated_at' => now(),
-        'status'       => 'pending',
+        'vehicle_id'   => $validated['vehicle_id'],
         'partner_id'   => $request->user()->id,
+        'report_type'  => implode(',', $validated['findings']['types']), // store as comma separated
+        'findings'     => $validated['findings'],
+        'kilometrage'  => $validated['kilometrage'] ?? null,
+        'risk_score'   => $validated['risk_score'] ?? null,
+        'status'       => $validated['status'] ?? 'draft',
+        'generated_at' => now(),
+        'report_date'  => now(),
     ]);
 
-    return response()->json($report, 201);
+    return response()->json([
+        'message' => 'Report created successfully',
+        'report'  => $report->load('vehicle', 'partner'),
+    ], 201);
 }
-
 
 public function verify(Request $request, Report $report)
 {
