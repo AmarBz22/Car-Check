@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PartnerRequestController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\UserController;
 
 
 // Public routes
@@ -79,4 +80,11 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/partners', [PartnerRequestController::class, 'getAllPartners']);
     Route::get('/partners/{id}', [PartnerRequestController::class, 'getPartnerById']);
+});
+
+Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+    Route::get('/admin/users', [UserController::class, 'index']);
+    Route::get('/admin/users/{id}', [UserController::class, 'show']);
+    Route::put('/admin/users/{id}', [UserController::class, 'update']);
+    Route::delete('/admin/users/{id}', [UserController::class, 'destroy']);
 });
