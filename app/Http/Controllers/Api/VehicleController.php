@@ -13,31 +13,47 @@ class VehicleController extends Controller
     /**
      * List vehicles with pagination and optional filters
      */
-    public function index(Request $request)
-    {
-        $query = Vehicle::with('verifier'); // eager load verifier
+public function index(Request $request)
+{
+    $query = Vehicle::with('verifier');
 
-        // Filter by status if provided (pending, verified, rejected)
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        // Search by plate number or VIN
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('plate_number', 'like', "%{$search}%")
-                  ->orWhere('vin', 'like', "%{$search}%");
-            });
-        }
-
-        // Paginate results (default 10 per page)
-        $perPage = $request->input('per_page', 10);
-        $vehicles = $query->orderBy('created_at', 'desc')
-                          ->paginate($perPage);
-
-        return response()->json($vehicles);
+    // Filter by status
+    if ($request->has('status')) {
+        $query->where('status', $request->status);
     }
+
+    // Search by plate number, VIN, or brand
+    if ($request->has('search')) {
+        $search = $request->search;
+        $query->where(function($q) use ($search) {
+            $q->where('plate_number', 'like', "%{$search}%")
+              ->orWhere('vin', 'like', "%{$search}%")
+              ->orWhere('brand', 'like', "%{$search}%");
+        });
+    }
+
+    // Filter by brand (exact)
+    if ($request->has('brand')) {
+        $query->where('brand', $request->brand);
+    }
+
+    // Filter by year
+    if ($request->has('year')) {
+        $query->where('year', $request->year);
+    }
+
+    // Filter by creator (user_id)
+    if ($request->has('user_id')) {
+        $query->where('user_id', $request->user_id);
+    }
+
+    // Paginate results
+    $perPage = $request->input('per_page', 10);
+    $vehicles = $query->orderBy('created_at', 'desc')
+                      ->paginate($perPage);
+
+    return response()->json($vehicles);
+}
 
 /**
  * Show a single vehicle
@@ -48,10 +64,10 @@ class VehicleController extends Controller
 public function show($id)
 {
     $vehicle = Vehicle::with('images')->findOrFail($id);
-    
+
     // Convert to array to manipulate
     $vehicleArray = $vehicle->toArray();
-    
+
     // Format images with full URLs
     if (isset($vehicleArray['images'])) {
         $vehicleArray['images'] = array_map(function($image) {
@@ -62,7 +78,7 @@ public function show($id)
             ];
         }, $vehicleArray['images']);
     }
-    
+
     return response()->json($vehicleArray);
 }
 
@@ -100,7 +116,7 @@ public function show($id)
 public function update(Request $request, $id)
 {
     $vehicle = Vehicle::findOrFail($id);
-    
+
     $data = $request->validate([
         'plate_number' => [
             'sometimes',
