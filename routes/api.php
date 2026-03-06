@@ -56,7 +56,7 @@ Route::get('/payments/back', [PaymentController::class, 'paymentBack'])
     ->name('reports.payment_back');
 
 // Partner Reports Routes
-Route::middleware(['auth:sanctum', 'role:partner'])->group(function () {
+Route::middleware(['auth:sanctum', 'role:admin,partner'])->group(function () {
     // Create and manage own reports
     Route::post('/partner/reports', [ReportController::class, 'store']);
     Route::get('/partner/reports', [ReportController::class, 'getPartnerReports']);

@@ -16,11 +16,11 @@ class ReportController extends Controller
 public function store(Request $request)
 {
     // Check if user is a partner
-    if (!$request->user()->isPartner()) {
-        return response()->json([
-            'message' => 'Only partners can submit reports'
-        ], 403);
-    }
+    // if (!$request->user()->isPartner()) {
+    //     return response()->json([
+    //         'message' => 'Only partners can create reports'
+    //     ], 403);
+    // }
 
     // Validate request data
     $validated = $request->validate([
@@ -57,11 +57,11 @@ public function store(Request $request)
      */
     public function getPartnerReports(Request $request)
     {
-        if (!$request->user()->isPartner()) {
-            return response()->json([
-                'message' => 'Only partners can view reports'
-            ], 403);
-        }
+        // if (!$request->user()->isPartner()) {
+        //     return response()->json([
+        //         'message' => 'Only partners can view reports'
+        //     ], 403);
+        // }
 
         $status = $request->query('status'); // draft, submitted, approved, rejected
 
@@ -85,11 +85,11 @@ public function store(Request $request)
         $report = Report::with(['vehicle', 'partner', 'payment'])->findOrFail($reportId);
 
         // Check authorization: partner can view own, admin can view all
-        if ($request->user()->isPartner() && $report->partner_id !== $request->user()->id) {
-            return response()->json([
-                'message' => 'Unauthorized'
-            ], 403);
-        }
+        // if ($request->user()->isPartner() && $report->partner_id !== $request->user()->id) {
+        //     return response()->json([
+        //         'message' => 'Unauthorized'
+        //     ], 403);
+        // }
 
         return response()->json($report, 200);
     }
@@ -99,11 +99,11 @@ public function store(Request $request)
      */
     public function update(Request $request, $reportId)
     {
-        if (!$request->user()->isPartner()) {
-            return response()->json([
-                'message' => 'Only partners can update reports'
-            ], 403);
-        }
+        // if (!$request->user()->isPartner()) {
+        //     return response()->json([
+        //         'message' => 'Only partners can update reports'
+        //     ], 403);
+        // }
 
         $report = Report::findOrFail($reportId);
 
@@ -141,11 +141,11 @@ public function store(Request $request)
      */
     public function submit(Request $request, $reportId)
     {
-        if (!$request->user()->isPartner()) {
-            return response()->json([
-                'message' => 'Only partners can submit reports'
-            ], 403);
-        }
+        // if (!$request->user()->isPartner()) {
+        //     return response()->json([
+        //         'message' => 'Only partners can submit reports'
+        //     ], 403);
+        // }
 
         $report = Report::findOrFail($reportId);
 
@@ -178,11 +178,11 @@ public function store(Request $request)
      */
     public function destroy(Request $request, $reportId)
     {
-        if (!$request->user()->isPartner()) {
-            return response()->json([
-                'message' => 'Only partners can delete reports'
-            ], 403);
-        }
+        // if (!$request->user()->isPartner()) {
+        //     return response()->json([
+        //         'message' => 'Only partners can delete reports'
+        //     ], 403);
+        // }
 
         $report = Report::findOrFail($reportId);
 
