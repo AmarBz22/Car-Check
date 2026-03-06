@@ -80,29 +80,43 @@ class StatisticsController extends Controller
         ];
     }
 
+ // ... other methods
+
     private function getGrowthStats()
     {
+        $isSqlite = \DB::getDriverName() === 'sqlite';
+        
+        // Use strftime for SQLite, MONTH/YEAR for MySQL
+        $monthFunc = $isSqlite ? "strftime('%m', created_at)" : "MONTH(created_at)";
+        $yearFunc  = $isSqlite ? "strftime('%Y', created_at)" : "YEAR(created_at)";
+
         return [
-            'users_per_month' => User::selectRaw('MONTH(created_at) as month, YEAR(created_at) as year, count(*) as total')
+            'users_per_month' => User::selectRaw("{$monthFunc} as month, {$yearFunc} as year, count(*) as total")
                 ->groupBy('year', 'month')
                 ->orderBy('year', 'asc')
                 ->orderBy('month', 'asc')
                 ->get(),
-            'reports_per_month' => Report::selectRaw('MONTH(created_at) as month, YEAR(created_at) as year, count(*) as total')
+                
+            'reports_per_month' => Report::selectRaw("{$monthFunc} as month, {$yearFunc} as year, count(*) as total")
                 ->groupBy('year', 'month')
                 ->orderBy('year', 'asc')
                 ->orderBy('month', 'asc')
                 ->get(),
-            'vehicles_per_month' => Vehicle::selectRaw('MONTH(created_at) as month, YEAR(created_at) as year, count(*) as total')
-    ->groupByRaw('YEAR(created_at), MONTH(created_at)')
-    ->orderBy('year', 'asc')
-    ->orderBy('month', 'asc')
-    ->get(),
+                
+            'vehicles_per_month' => Vehicle::selectRaw("{$monthFunc} as month, {$yearFunc} as year, count(*) as total")
+                ->groupBy('year', 'month')
+                ->orderBy('year', 'asc')
+                ->orderBy('month', 'asc')
+                ->get(),
         ];
     }
 
     private function getPaymentStats()
     {
+        $isSqlite = \DB::getDriverName() === 'sqlite';
+        $monthFunc = $isSqlite ? "strftime('%m', created_at)" : "MONTH(created_at)";
+        $yearFunc  = $isSqlite ? "strftime('%Y', created_at)" : "YEAR(created_at)";
+
         return [
             'total_revenue' => Payment::where('status', 'paid')->sum('amount'),
             'paid_vs_unpaid' => [
@@ -118,7 +132,7 @@ class StatisticsController extends Controller
                 ->orderBy('total_revenue', 'desc')
                 ->get(),
             'revenue_per_month' => Payment::where('status', 'paid')
-                ->selectRaw('MONTH(created_at) as month, YEAR(created_at) as year, sum(amount) as total_revenue')
+                ->selectRaw("{$monthFunc} as month, {$yearFunc} as year, sum(amount) as total_revenue")
                 ->groupBy('year', 'month')
                 ->orderBy('year', 'asc')
                 ->orderBy('month', 'asc')

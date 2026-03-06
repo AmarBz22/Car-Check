@@ -17,40 +17,39 @@ public function index(Request $request)
 {
     $query = Vehicle::with('verifier');
 
-    // Filter by status
-    if ($request->has('status')) {
-        $query->where('status', $request->status);
-    }
+    
 
     // Search by plate number, VIN, or brand
-    if ($request->has('search')) {
+    $query->when($request->filled('search'), function ($q) use ($request) {
         $search = $request->search;
-        $query->where(function($q) use ($search) {
-            $q->where('plate_number', 'like', "%{$search}%")
-              ->orWhere('vin', 'like', "%{$search}%")
-              ->orWhere('brand', 'like', "%{$search}%");
+        return $q->where(function($sub) use ($search) {
+            $sub->where('plate_number', 'like', "%{$search}%")
+                ->orWhere('vin', 'like', "%{$search}%")
+                ->orWhere('brand', 'like', "%{$search}%");
         });
-    }
+    });
 
-    // Filter by brand (exact)
-    if ($request->has('brand')) {
-        $query->where('brand', $request->brand);
-    }
+    // Filter by brand
+    $query->when($request->filled('brand'), function ($q) use ($request) {
+        return $q->where('brand', $request->brand);
+    });
 
     // Filter by year
-    if ($request->has('year')) {
-        $query->where('year', $request->year);
-    }
+    $query->when($request->filled('year'), function ($q) use ($request) {
+        return $q->where('year', $request->year);
+    });
 
-    // Filter by creator (user_id)
-    if ($request->has('user_id')) {
-        $query->where('user_id', $request->user_id);
-    }
+    // IMPORTANT: Check if user_id filter is accidentally nulling results
+    $query->when($request->filled('user_id'), function ($q) use ($request) {
+        return $q->where('user_id', $request->user_id);
+    });
 
-    // Paginate results
     $perPage = $request->input('per_page', 10);
-    $vehicles = $query->orderBy('created_at', 'desc')
-                      ->paginate($perPage);
+    
+    // Debugging Tip: Uncomment the line below to see the SQL in your network tab
+    // return response()->json($query->toSql());
+
+    $vehicles = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
     return response()->json($vehicles);
 }
