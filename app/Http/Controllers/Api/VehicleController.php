@@ -17,7 +17,7 @@ public function index(Request $request)
 {
     $query = Vehicle::with('verifier');
 
-    
+
 
     // Search by plate number, VIN, or brand
     $query->when($request->filled('search'), function ($q) use ($request) {
@@ -45,7 +45,7 @@ public function index(Request $request)
     });
 
     $perPage = $request->input('per_page', 10);
-    
+
     // Debugging Tip: Uncomment the line below to see the SQL in your network tab
     // return response()->json($query->toSql());
 
@@ -84,21 +84,23 @@ public function show($id)
     /**
      * Create a new vehicle
      */
-    public function store(Request $request)
-    {
-        $data = $request->validate([
-            'plate_number' => 'required|unique:vehicles,plate_number',
-            'vin'          => 'nullable|unique:vehicles,vin',
-            'brand'        => 'required|string',
-            'model'        => 'required|string',
-            'year'         => 'required|digits:4',
-            'color'        => 'nullable|string',
-        ]);
+public function store(Request $request)
+{
+    $data = $request->validate([
+        'plate_number' => 'required|unique:vehicles,plate_number',
+        'vin'          => 'nullable|unique:vehicles,vin',
+        'brand'        => 'required|string',
+        'model'        => 'required|string',
+        'year'         => 'required|digits:4',
+        'color'        => 'nullable|string',
+    ]);
 
-        $vehicle = Vehicle::create($data);
+    $data['user_id'] = auth()->id();
 
-        return response()->json($vehicle, 201);
-    }
+    $vehicle = Vehicle::create($data);
+
+    return response()->json($vehicle, 201);
+}
 
     /**
      * Update vehicle info
