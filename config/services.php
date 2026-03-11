@@ -34,5 +34,11 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'chargily' => [
+    'secret_key'     => env('CHARGILY_SECRET_KEY'),
+    'webhook_secret' => env('CHARGILY_WEBHOOK_SECRET'),
+    'base_url'       => env('CHARGILY_BASE_URL', 'https://pay.chargily.net/test/api/v2'),
+    'report_price'   => env('CHARGILY_REPORT_PRICE', 25000),
+],
 
 ];

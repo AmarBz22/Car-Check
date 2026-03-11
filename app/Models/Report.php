@@ -1,4 +1,5 @@
 <?php
+// app/Models/Report.php
 
 namespace App\Models;
 
@@ -21,12 +22,13 @@ class Report extends Model
     ];
 
     protected $casts = [
-        'findings' => 'json',
+        'findings'    => 'json',
         'report_date' => 'datetime',
-        'generated_at' => 'datetime',
+        'generated_at'=> 'datetime',
     ];
 
-    // Scopes for status
+    // ─── Scopes ───────────────────────────────────────────────────
+
     public function scopePending($query)
     {
         return $query->where('status', 'submitted');
@@ -42,6 +44,8 @@ class Report extends Model
         return $query->where('status', 'draft');
     }
 
+    // ─── Relationships ────────────────────────────────────────────
+
     public function vehicle()
     {
         return $this->belongsTo(Vehicle::class);
@@ -56,6 +60,17 @@ class Report extends Model
     {
         return $this->belongsTo(Payment::class);
     }
+
+    // ─── Helpers ──────────────────────────────────────────────────
+
+    /**
+     * Is this report downloadable right now?
+     * Checks the linked payment's 48h window.
+     */
+    public function isAccessibleBy(int $userId): bool
+    {
+        return $this->payment !== null
+            && $this->payment->user_id === $userId
+            && $this->payment->hasActiveAccess();
+    }
 }
-
-

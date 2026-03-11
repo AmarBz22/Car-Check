@@ -94,3 +94,15 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('/admin/dashboard', [StatisticsController::class, 'dashboard']);
     Route::get('/admin/dashboard/payments', [StatisticsController::class, 'paymentStats']);
 });
+
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/payments/create',            [PaymentController::class, 'createPayment']);
+    Route::get('/reports/{report}/download',   [PaymentController::class, 'downloadReport']);
+});
+
+Route::get('/payments/back',               [PaymentController::class, 'paymentBack'])->name('payment.back');
+// Webhook: no CSRF, no auth — but HMAC-verified inside controller
+Route::post('/payments/webhook', [PaymentController::class, 'webhook'])
+    ->withoutMiddleware(['auth:sanctum', 'csrf'])
+    ->name('payment.webhook');

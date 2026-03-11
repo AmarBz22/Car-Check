@@ -22,12 +22,12 @@ public function register(Request $request)
     ]);
 
     $user = User::create([
-        'name' => $request->name,
-        'email' => $request->email,
-        'password' => bcrypt($request->password),
-        'role' => 'client',
-        'status' => 'active',
-    ]);
+    'name'     => $request->name,
+    'email'    => $request->email,
+    'password' => $request->password, // ← plain, cast hashes it
+    'role'     => 'client',
+    'status'   => 'active',
+]);
 
     $token = $user->createToken('api-token')->plainTextToken;
 

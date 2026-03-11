@@ -1,4 +1,5 @@
 <?php
+// app/Models/Payment.php
 
 namespace App\Models;
 
@@ -11,34 +12,57 @@ class Payment extends Model
 
     protected $fillable = [
         'user_id',
-        'vehicle_id',          // better than chassis for FK integrity
+        'vehicle_id',
         'amount',
         'currency',
         'chargily_payment_id',
         'status',
+        'expires_at',
     ];
 
-    /**
-     * The user who made the payment
-     */
+    protected $casts = [
+        'expires_at' => 'datetime',
+        'amount'     => 'integer',
+    ];
+
+    // ─── Relationships ────────────────────────────────────────────
+
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * The vehicle this payment is for
-     */
     public function vehicle()
     {
         return $this->belongsTo(Vehicle::class);
     }
 
     /**
-     * Optional: reports associated with this payment
+     * The report unlocked by this payment
      */
-    public function reports()
+    public function report()
     {
-        return $this->belongsToMany(Report::class, 'payment_report');
+        return $this->hasOne(Report::class);
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────
+
+    public function hasActiveAccess(): bool
+    {
+        return $this->status === 'paid'
+            && $this->expires_at !== null
+            && $this->expires_at->isFuture();
+    }
+
+    /**
+     * Scope: find a valid paid + non-expired payment for user + vehicle
+     */
+    public function scopeActiveAccessFor($query, int $userId, int $vehicleId)
+    {
+        return $query
+            ->where('user_id', $userId)
+            ->where('vehicle_id', $vehicleId)
+            ->where('status', 'paid')
+            ->where('expires_at', '>', now());
     }
 }

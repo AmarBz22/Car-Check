@@ -1,96 +1,246 @@
 <?php
+// app/Http/Controllers/Api/PaymentController.php
 
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Payment;
+use App\Models\Report;
+use App\Models\Vehicle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use App\Models\Payment;
-use App\Models\Vehicle;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class PaymentController extends Controller
 {
-    /**
-     * Step 1: Create checkout and return payment URL to client
-     */
-public function createPayment(Request $request)
-{
-    $request->validate([
-        'vehicle_id' => 'required|exists:vehicles,id',
-    ]);
+    private string $apiKey;
+    private string $baseUrl;
+    private string $webhookSecret;
 
-    $user = $request->user();
-    $vehicle = Vehicle::findOrFail($request->vehicle_id);
-
-    $amount = 25000; // Example amount in DZD
-
-    $response = Http::withOptions(['verify' => false])
-        ->withHeaders([
-            'Authorization' => 'Bearer test_sk_3G0kRT88iirBMYi0gzot6UVetdyHIq9ZwjZsE2ZV',
-        ])->post('https://pay.chargily.net/test/api/v2/checkouts', [
-            'amount' => $amount,
-            'currency' => 'dzd',
-            'description' => "Payment for vehicle report #{$vehicle->id}",
-            'metadata' => [
-                'vehicle_id' => $vehicle->id,
-            ],
-            'success_url' => route('reports.payment_back'),
-            'failure_url' => route('reports.payment_back'),
-        ]);
-
-    if ($response->failed()) {
-        return response()->json([
-            'message' => 'Failed to create payment',
-            'error' => $response->json(),
-        ], 500);
+    public function __construct()
+    {
+        $this->apiKey        = config('services.chargily.secret_key');
+        $this->baseUrl       = config('services.chargily.base_url');
+        $this->webhookSecret = config('services.chargily.webhook_secret');
     }
 
-    $data = $response->json();
+    // ─────────────────────────────────────────────────────────────
+    // STEP 1 — Initiate checkout
+    // ─────────────────────────────────────────────────────────────
+
+    public function createPayment(Request $request)
+    {
+        $request->validate([
+            'vehicle_id' => 'required|exists:vehicles,id',
+        ]);
+
+        $user    = $request->user();
+        $vehicle = Vehicle::findOrFail($request->vehicle_id);
+
+        // Block if user already has active access
+        $existing = Payment::activeAccessFor($user->id, $vehicle->id)->first();
+        if ($existing) {
+            return response()->json([
+                'message'    => 'You already have active access to this vehicle\'s reports.',
+                'expires_at' => $existing->expires_at,
+            ], 409);
+        }
+
+        // Report must exist and be approved before user can pay
+        $report = Report::where('vehicle_id', $vehicle->id)
+            ->approved()
+            ->latest()
+            ->first();
+
+        if (!$report) {
+            return response()->json([
+                'message' => 'No approved report is available for this vehicle yet.',
+            ], 404);
+        }
+
+        $amount = config('services.chargily.report_price');
+
+        // Create PENDING payment before redirecting user
+        $payment = Payment::create([
+            'user_id'    => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'amount'     => $amount,
+            'currency'   => 'dzd',
+            'status'     => 'pending',
+        ]);
+
+$response = Http::withHeaders([
+    'Authorization' => "Bearer {$this->apiKey}",
+])->withOptions([
+    'verify' => false, // ⚠️ LOCAL TESTING ONLY — remove before production
+])->post("{$this->baseUrl}/checkouts", [
+    'amount'      => $amount,
+    'currency'    => 'dzd',
+    'description' => "Vehicle report – {$vehicle->chassis_number}",
+    'metadata'    => [
+        'payment_id' => $payment->id,
+        'user_id'    => $user->id,
+        'vehicle_id' => $vehicle->id,
+        'report_id'  => $report->id,
+    ],
+    'success_url' => route('payment.back'),
+    'failure_url' => route('payment.back'),
+]);
+
+        if ($response->failed()) {
+            $payment->update(['status' => 'failed']);
+
+            Log::error('Chargily checkout failed', [
+                'payment_id' => $payment->id,
+                'error'      => $response->json(),
+            ]);
+
+            return response()->json([
+                'message' => 'Could not initiate payment. Please try again.',
+            ], 502);
+        }
+
+        $data = $response->json();
+
+        $payment->update(['chargily_payment_id' => $data['id']]);
+
+        return response()->json([
+            'payment_url' => $data['checkout_url'],
+            'checkout_id' => $data['id'],
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // STEP 2 — Webhook (Chargily → your server)
+    // ─────────────────────────────────────────────────────────────
+
+    public function webhook(Request $request)
+    {
+        // Verify the request is genuinely from Chargily
+        if (!$this->verifyWebhookSignature($request)) {
+            Log::warning('Webhook: invalid signature', ['ip' => $request->ip()]);
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $payload  = $request->json()->all();
+        $event    = $payload['type'] ?? '';
+
+        // Only handle successful checkouts
+        if ($event !== 'checkout.paid') {
+            return response()->json(['message' => 'Event ignored'], 200);
+        }
+
+        $checkout = $payload['data'] ?? [];
+        $metadata = $checkout['metadata'] ?? [];
+
+        if (empty($metadata['payment_id']) || empty($metadata['report_id'])) {
+            Log::error('Webhook: missing metadata', $payload);
+            return response()->json(['message' => 'Invalid metadata'], 400);
+        }
+
+        $payment = Payment::find($metadata['payment_id']);
+
+        if (!$payment) {
+            Log::error('Webhook: payment not found', $metadata);
+            return response()->json(['message' => 'Payment not found'], 404);
+        }
+
+        // Idempotency — skip if already processed
+        if ($payment->status === 'paid') {
+            return response()->json(['message' => 'Already processed'], 200);
+        }
+
+        // Confirm payment and open the 48h access window
+        $payment->update([
+            'status'     => 'paid',
+            'expires_at' => now()->addHours(48),
+        ]);
+
+        // Link the report to this payment (the actual unlock)
+        Report::where('id', $metadata['report_id'])
+            ->where('vehicle_id', $payment->vehicle_id) // safety check
+            ->update(['payment_id' => $payment->id]);
+
+        Log::info('Payment confirmed + report unlocked', [
+            'payment_id' => $payment->id,
+            'report_id'  => $metadata['report_id'],
+            'expires_at' => $payment->expires_at,
+        ]);
+
+        return response()->json(['message' => 'Payment confirmed']);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // STEP 3 — User lands back after Chargily redirect
+    // ─────────────────────────────────────────────────────────────
+
+public function paymentBack(Request $request)
+{
+    $checkoutId = $request->input('checkout_id');
+
+    $payment = Payment::where('chargily_payment_id', $checkoutId)
+        ->with('report')
+        ->first();
+
+    if (!$payment) {
+        return response()->json(['message' => 'Payment not found.'], 404);
+    }
 
     return response()->json([
-        'payment_url' => $data['checkout_url'], // Changed from payment_url
-        'checkout_id' => $data['id'],
+        'status'     => $payment->status,
+        'expires_at' => $payment->expires_at,
+        'report_id'  => $payment->report?->id,
+        'message'    => match ($payment->status) {
+            'paid'    => 'Payment confirmed. You have 48 hours to download your report.',
+            'pending' => 'Payment is still processing. Please check back shortly.',
+            'failed'  => 'Payment failed. Please try again.',
+            default   => 'Unknown status.',
+        },
     ]);
 }
 
-    /**
-     * Step 2: Webhook - Called by Chargily when payment completes
-     */
-    public function webhook(Request $request)
-    {
-        $payload = $request->all();
+    // ─────────────────────────────────────────────────────────────
+    // DOWNLOAD — 48h access guard
+    // ─────────────────────────────────────────────────────────────
 
-        if (!isset($payload['invoice_id'], $payload['status'], $payload['metadata'])) {
-            return response()->json(['message' => 'Invalid payload'], 400);
+    public function downloadReport(Request $request, Report $report)
+    {
+        $user = $request->user();
+
+        // Load payment to check access
+        $report->load('payment');
+
+        if (!$report->isAccessibleBy($user->id)) {
+            return response()->json([
+                'message' => 'Access denied. Purchase the report or your 48-hour window has expired.',
+            ], 403);
         }
 
-        $metadata = $payload['metadata'];
-        $status = $payload['status'] === 'paid' ? 'paid' : 'failed';
+        if (!$report->pdf_path || !Storage::disk('private')->exists($report->pdf_path)) {
+            return response()->json(['message' => 'Report PDF not found.'], 404);
+        }
 
-        // Store payment linked to authenticated user (if any) and vehicle
-        $payment = Payment::create([
-            'user_id' => $request->user()?->id, // optional, will be null if webhook call is unauthenticated
-            'vehicle_id' => $metadata['vehicle_id'] ?? null,
-            'amount' => $payload['amount'] ?? null,
-            'currency' => $payload['currency'] ?? 'DZD',
-            'chargily_payment_id' => $payload['invoice_id'],
-            'status' => $status,
-        ]);
-
-        return response()->json([
-            'message' => 'Payment processed',
-            'payment' => $payment
-        ]);
+        return Storage::disk('private')->download(
+            $report->pdf_path,
+            "vehicle-report-{$report->id}.pdf"
+        );
     }
 
-    /**
-     * Optional: Back page when user returns from Chargily
-     */
-    public function paymentBack(Request $request)
+    // ─────────────────────────────────────────────────────────────
+    // PRIVATE — HMAC signature check
+    // ─────────────────────────────────────────────────────────────
+
+    private function verifyWebhookSignature(Request $request): bool
     {
-        return response()->json([
-            'message' => 'You can now check your payment status',
-            'checkout_id' => $request->input('checkout_id'),
-        ]);
+        $signature = $request->header('signature');
+
+        if (!$signature) {
+            return false;
+        }
+
+        $expected = hash_hmac('sha256', $request->getContent(), $this->webhookSecret);
+
+        return hash_equals($expected, $signature);
     }
 }
