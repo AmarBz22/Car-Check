@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
 use App\Models\User;
 use App\Models\RegistrationRequest;
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\PartnerRegistrationRequestNotification;
 
 class AuthController extends Controller
 {
@@ -74,30 +76,37 @@ public function register(Request $request)
     /**
      * Partner Registration Request - Submit request to join as partner
      */
-    public function requestPartnerRegistration(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:registration_requests,email|unique:users,email',
-            'company_name' => 'required|string|max:255',
-            'phone' => 'nullable|string',
-            'reason' => 'nullable|string|max:1000',
-        ]);
+public function requestPartnerRegistration(Request $request)
+{
+    $request->validate([
+        'name'         => 'required|string|max:255',
+        'email'        => 'required|email|unique:registration_requests,email|unique:users,email',
+        'company_name' => 'required|string|max:255',
+        'phone'        => 'nullable|string',
+        'reason'       => 'nullable|string|max:1000',
+    ]);
 
-        $registrationRequest = RegistrationRequest::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'company_name' => $request->company_name,
-            'phone' => $request->phone,
-            'reason' => $request->reason,
-            'status' => 'pending',
-        ]);
+    $registrationRequest = RegistrationRequest::create([
+        'name'         => $request->name,
+        'email'        => $request->email,
+        'company_name' => $request->company_name,
+        'phone'        => $request->phone,
+        'reason'       => $request->reason,
+        'status'       => 'pending',
+    ]);
 
-        return response()->json([
-            'message' => 'Registration request submitted. Admin will review and approve.',
-            'request' => $registrationRequest
-        ], 201);
-    }
+    // Notify all admins about the new partner request
+    $admins = User::where('role', 'admin')->get();
+    Notification::send(
+        $admins,
+        new PartnerRegistrationRequestNotification($registrationRequest)
+    );
+
+    return response()->json([
+        'message' => 'Registration request submitted. Admin will review and approve.',
+        'request' => $registrationRequest,
+    ], 201);
+}
 
     public function registerAdmin(Request $request)
     {

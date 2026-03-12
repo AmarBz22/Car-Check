@@ -9,8 +9,8 @@ class Vehicle extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-    'plate_number', // if you include this
+protected $fillable = [
+    'plate_number',
     'vin',
     'brand',
     'model',
@@ -18,6 +18,7 @@ class Vehicle extends Model
     'color',
     'status',
     'verified_by',
+    'user_id', // ← missing!
 ];
 
     // Relationship: Vehicle belongs to a User

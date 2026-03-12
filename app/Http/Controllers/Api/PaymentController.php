@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use App\Notifications\PaymentConfirmedNotification;
 
 class PaymentController extends Controller
 {
@@ -115,61 +116,64 @@ $response = Http::withHeaders([
     // STEP 2 — Webhook (Chargily → your server)
     // ─────────────────────────────────────────────────────────────
 
-    public function webhook(Request $request)
-    {
-        // Verify the request is genuinely from Chargily
-        if (!$this->verifyWebhookSignature($request)) {
-            Log::warning('Webhook: invalid signature', ['ip' => $request->ip()]);
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-        $payload  = $request->json()->all();
-        $event    = $payload['type'] ?? '';
-
-        // Only handle successful checkouts
-        if ($event !== 'checkout.paid') {
-            return response()->json(['message' => 'Event ignored'], 200);
-        }
-
-        $checkout = $payload['data'] ?? [];
-        $metadata = $checkout['metadata'] ?? [];
-
-        if (empty($metadata['payment_id']) || empty($metadata['report_id'])) {
-            Log::error('Webhook: missing metadata', $payload);
-            return response()->json(['message' => 'Invalid metadata'], 400);
-        }
-
-        $payment = Payment::find($metadata['payment_id']);
-
-        if (!$payment) {
-            Log::error('Webhook: payment not found', $metadata);
-            return response()->json(['message' => 'Payment not found'], 404);
-        }
-
-        // Idempotency — skip if already processed
-        if ($payment->status === 'paid') {
-            return response()->json(['message' => 'Already processed'], 200);
-        }
-
-        // Confirm payment and open the 48h access window
-        $payment->update([
-            'status'     => 'paid',
-            'expires_at' => now()->addHours(48),
-        ]);
-
-        // Link the report to this payment (the actual unlock)
-        Report::where('id', $metadata['report_id'])
-            ->where('vehicle_id', $payment->vehicle_id) // safety check
-            ->update(['payment_id' => $payment->id]);
-
-        Log::info('Payment confirmed + report unlocked', [
-            'payment_id' => $payment->id,
-            'report_id'  => $metadata['report_id'],
-            'expires_at' => $payment->expires_at,
-        ]);
-
-        return response()->json(['message' => 'Payment confirmed']);
+public function webhook(Request $request)
+{
+    if (!$this->verifyWebhookSignature($request)) {
+        Log::warning('Webhook: invalid signature', ['ip' => $request->ip()]);
+        return response()->json(['message' => 'Unauthorized'], 401);
     }
+
+    $payload  = $request->json()->all();
+    $event    = $payload['type'] ?? '';
+
+    if ($event !== 'checkout.paid') {
+        return response()->json(['message' => 'Event ignored'], 200);
+    }
+
+    $checkout = $payload['data'] ?? [];
+    $metadata = $checkout['metadata'] ?? [];
+
+    if (empty($metadata['payment_id']) || empty($metadata['report_id'])) {
+        Log::error('Webhook: missing metadata', $payload);
+        return response()->json(['message' => 'Invalid metadata'], 400);
+    }
+
+    $payment = Payment::find($metadata['payment_id']);
+
+    if (!$payment) {
+        Log::error('Webhook: payment not found', $metadata);
+        return response()->json(['message' => 'Payment not found'], 404);
+    }
+
+    if ($payment->status === 'paid') {
+        return response()->json(['message' => 'Already processed'], 200);
+    }
+
+    // Confirm payment and open 48h access window
+    $payment->update([
+        'status'     => 'paid',
+        'expires_at' => now()->addHours(48),
+    ]);
+
+    // Link report to this payment
+    Report::where('id', $metadata['report_id'])
+        ->where('vehicle_id', $payment->vehicle_id)
+        ->update(['payment_id' => $payment->id]);
+
+    // Load relationships needed for notification
+    $payment->load(['user', 'vehicle', 'report']);
+
+    // Notify the client
+    $payment->user->notify(new \App\Notifications\PaymentConfirmedNotification($payment));
+
+    Log::info('Payment confirmed + report unlocked', [
+        'payment_id' => $payment->id,
+        'report_id'  => $metadata['report_id'],
+        'expires_at' => $payment->expires_at,
+    ]);
+
+    return response()->json(['message' => 'Payment confirmed']);
+}
 
     // ─────────────────────────────────────────────────────────────
     // STEP 3 — User lands back after Chargily redirect
@@ -243,4 +247,48 @@ public function paymentBack(Request $request)
 
         return hash_equals($expected, $signature);
     }
+
+    // ─────────────────────────────────────────────────────────────
+// GET ALL PAYMENTS — Admin only
+// ─────────────────────────────────────────────────────────────
+
+public function index(Request $request)
+{
+    $query = Payment::with(['user', 'vehicle', 'report']);
+
+    // Filter by status
+    $query->when($request->filled('status'), function ($q) use ($request) {
+        return $q->where('status', $request->status);
+    });
+
+    // Filter by user
+    $query->when($request->filled('user_id'), function ($q) use ($request) {
+        return $q->where('user_id', $request->user_id);
+    });
+
+    // Filter by vehicle
+    $query->when($request->filled('vehicle_id'), function ($q) use ($request) {
+        return $q->where('vehicle_id', $request->vehicle_id);
+    });
+
+    $payments = $query->orderBy('created_at', 'desc')
+        ->paginate($request->input('per_page', 10));
+
+    return response()->json($payments);
 }
+
+// ─────────────────────────────────────────────────────────────
+// GET SINGLE PAYMENT — Admin only
+// ─────────────────────────────────────────────────────────────
+
+public function show(Payment $payment)
+{
+    $payment->load(['user', 'vehicle', 'report']);
+
+    return response()->json([
+        'payment'    => $payment,
+        'has_access' => $payment->hasActiveAccess(),
+    ]);
+}
+}
+

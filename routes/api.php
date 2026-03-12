@@ -56,6 +56,12 @@ Route::post('/payments/webhook', [PaymentController::class, 'webhook'])
 Route::get('/payments/back', [PaymentController::class, 'paymentBack'])
     ->name('reports.payment_back');
 
+
+Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+    Route::get('/payments',           [PaymentController::class, 'index']);
+    Route::get('/payments/{payment}', [PaymentController::class, 'show']);
+});
+
 // Partner Reports Routes
 Route::middleware(['auth:sanctum', 'role:admin,partner'])->group(function () {
     // Create and manage own reports
@@ -106,3 +112,11 @@ Route::get('/payments/back',               [PaymentController::class, 'paymentBa
 Route::post('/payments/webhook', [PaymentController::class, 'webhook'])
     ->withoutMiddleware(['auth:sanctum', 'csrf'])
     ->name('payment.webhook');
+
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/notifications',             [NotificationController::class, 'index']);
+    Route::get('/notifications/unread',      [NotificationController::class, 'unread']);
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::patch('/notifications/read-all',  [NotificationController::class, 'markAllAsRead']);
+});
