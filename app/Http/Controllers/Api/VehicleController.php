@@ -183,4 +183,39 @@ public function destroy($id)
     ], 201);
 }
 
+/**
+ * Search for a vehicle by exact VIN number
+ */
+public function searchByVin(Request $request)
+{
+    $request->validate([
+        'vin' => 'required|string|min:3',
+    ]);
+
+    $vehicle = Vehicle::with('images')
+        ->where('vin', $request->vin)
+        ->first();
+
+    if (!$vehicle) {
+        return response()->json([
+            'message' => 'No vehicle found with the provided VIN.'
+        ], 404);
+    }
+
+    $vehicleArray = $vehicle->toArray();
+
+    // Format images with full URLs (same as show())
+    if (isset($vehicleArray['images'])) {
+        $vehicleArray['images'] = array_map(function ($image) {
+            return [
+                'id'   => $image['id'],
+                'url'  => url('storage/' . $image['image_path']),
+                'path' => $image['image_path'],
+            ];
+        }, $vehicleArray['images']);
+    }
+
+    return response()->json($vehicleArray);
+}
+
 }

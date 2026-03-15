@@ -32,6 +32,8 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('/admin/partners/create', [PartnerRequestController::class, 'createDirectPartner']);
 });
 
+Route::get('/vehicles/search/vin', [VehicleController::class, 'searchByVin']);
+
 Route::middleware(['auth:sanctum', 'role:admin,partner'])->group(function () {
     Route::post('/vehicles', [VehicleController::class, 'store']);
     Route::put('/vehicles/{id}', [VehicleController::class, 'update']);
