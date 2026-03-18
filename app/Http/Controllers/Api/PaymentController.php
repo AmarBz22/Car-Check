@@ -30,88 +30,86 @@ class PaymentController extends Controller
     // STEP 1 — Initiate checkout
     // ─────────────────────────────────────────────────────────────
 
-    public function createPayment(Request $request)
-    {
-        $request->validate([
-            'vehicle_id' => 'required|exists:vehicles,id',
-        ]);
+ public function createPayment(Request $request)
+{
+    $request->validate([
+        'vehicle_id' => 'required|exists:vehicles,id',
+    ]);
 
-        $user    = $request->user();
-        $vehicle = Vehicle::findOrFail($request->vehicle_id);
+    $user    = $request->user();
+    $vehicle = Vehicle::findOrFail($request->vehicle_id);
 
-        // Block if user already has active access
-        $existing = Payment::activeAccessFor($user->id, $vehicle->id)->first();
-        if ($existing) {
-            return response()->json([
-                'message'    => 'You already have active access to this vehicle\'s reports.',
-                'expires_at' => $existing->expires_at,
-            ], 409);
-        }
-
-        // Report must exist and be approved before user can pay
-        $report = Report::where('vehicle_id', $vehicle->id)
-            ->approved()
-            ->latest()
-            ->first();
-
-        if (!$report) {
-            return response()->json([
-                'message' => 'No approved report is available for this vehicle yet.',
-            ], 404);
-        }
-
-        $amount = config('services.chargily.report_price');
-
-        // Create PENDING payment before redirecting user
-        $payment = Payment::create([
-            'user_id'    => $user->id,
-            'vehicle_id' => $vehicle->id,
-            'amount'     => $amount,
-            'currency'   => 'dzd',
-            'status'     => 'pending',
-        ]);
-
-$response = Http::withHeaders([
-    'Authorization' => "Bearer {$this->apiKey}",
-])->withOptions([
-    'verify' => false, // ⚠️ LOCAL TESTING ONLY — remove before production
-])->post("{$this->baseUrl}/checkouts", [
-    'amount'      => $amount,
-    'currency'    => 'dzd',
-    'description' => "Vehicle report – {$vehicle->chassis_number}",
-    'metadata'    => [
-        'payment_id' => $payment->id,
-        'user_id'    => $user->id,
-        'vehicle_id' => $vehicle->id,
-        'report_id'  => $report->id,
-    ],
-    'success_url' => route('payment.back'),
-    'failure_url' => route('payment.back'),
-]);
-
-        if ($response->failed()) {
-            $payment->update(['status' => 'failed']);
-
-            Log::error('Chargily checkout failed', [
-                'payment_id' => $payment->id,
-                'error'      => $response->json(),
-            ]);
-
-            return response()->json([
-                'message' => 'Could not initiate payment. Please try again.',
-            ], 502);
-        }
-
-        $data = $response->json();
-
-        $payment->update(['chargily_payment_id' => $data['id']]);
-
+    // Block if user already has active access
+    $existing = Payment::activeAccessFor($user->id, $vehicle->id)->first();
+    if ($existing) {
         return response()->json([
-            'payment_url' => $data['checkout_url'],
-            'checkout_id' => $data['id'],
-        ]);
+            'message'    => 'You already have active access to this vehicle\'s reports.',
+            'expires_at' => $existing->expires_at,
+        ], 409);
     }
 
+    // Get the latest report for this vehicle
+    $report = Report::where('vehicle_id', $vehicle->id)
+        ->latest()
+        ->first();
+
+    if (!$report) {
+        return response()->json([
+            'message' => 'No report is available for this vehicle yet.',
+        ], 404);
+    }
+
+    $amount = config('services.chargily.report_price');
+
+    // Create PENDING payment before redirecting user
+    $payment = Payment::create([
+        'user_id'    => $user->id,
+        'vehicle_id' => $vehicle->id,
+        'amount'     => $amount,
+        'currency'   => 'dzd',
+        'status'     => 'pending',
+    ]);
+
+    $response = Http::withHeaders([
+        'Authorization' => "Bearer {$this->apiKey}",
+    ])->withOptions([
+        'verify' => false, // ⚠️ LOCAL TESTING ONLY — remove before production
+    ])->post("{$this->baseUrl}/checkouts", [
+        'amount'      => $amount,
+        'currency'    => 'dzd',
+        'description' => "Vehicle report – {$vehicle->chassis_number}",
+        'metadata'    => [
+            'payment_id' => $payment->id,
+            'user_id'    => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'report_id'  => $report->id,
+        ],
+        'success_url' => route('payment.back'),
+        'failure_url' => route('payment.back'),
+    ]);
+
+    if ($response->failed()) {
+        $payment->update(['status' => 'failed']);
+
+        Log::error('Chargily checkout failed', [
+            'payment_id' => $payment->id,
+            'error'      => $response->json(),
+        ]);
+
+        return response()->json([
+            'message' => 'Could not initiate payment. Please try again.',
+        ], 502);
+    }
+
+    $data = $response->json();
+
+    $payment->update(['chargily_payment_id' => $data['id']]);
+
+    return response()->json([
+        'payment_url' => $data['checkout_url'],
+        'checkout_id' => $data['id'],
+    ]);
+}
     // ─────────────────────────────────────────────────────────────
     // STEP 2 — Webhook (Chargily → your server)
     // ─────────────────────────────────────────────────────────────

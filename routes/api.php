@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\PartnerRequestController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\StatisticsController;
+use App\Http\Controllers\Api\NotificationController;
+
 
 
 // Public routes

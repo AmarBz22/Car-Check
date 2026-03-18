@@ -2,14 +2,12 @@
 namespace App\Notifications;
 
 use App\Models\RegistrationRequest;
-use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class PartnerRegistrationRequestNotification extends Notification
 {
-    use Queueable;
-
+    // ✅ Removed Queueable — runs synchronously now
     public function __construct(public RegistrationRequest $registrationRequest) {}
 
     public function via(object $notifiable): array

@@ -8,12 +8,16 @@ use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
-    public function index(Request $request)
-    {
-        return response()->json(
-            $request->user()->notifications()->paginate($request->input('per_page', 15))
-        );
-    }
+// Add this temporarily to your NotificationController index method
+public function index(Request $request)
+{
+    \Log::info('Auth user id: ' . $request->user()->id);
+    \Log::info('Notifications count: ' . $request->user()->notifications()->count());
+
+    return response()->json(
+        $request->user()->notifications()->paginate($request->input('per_page', 15))
+    );
+}
 
     public function unread(Request $request)
     {

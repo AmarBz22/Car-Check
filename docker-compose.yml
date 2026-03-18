@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+
+  app:
+    build: .
+    container_name: vincheck_app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - .:/var/www
+    depends_on:
+      - db
+
+  nginx:
+    image: nginx:latest
+    container_name: vincheck_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - .:/var/www
+      - ./docker/nginx:/etc/nginx/conf.d
+    depends_on:
+      - app
+
+  db:
+    image: mysql:8
+    container_name: vincheck_db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: car_check
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - dbdata:/var/lib/mysql
+
+volumes:
+  dbdata:
