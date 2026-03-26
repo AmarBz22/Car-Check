@@ -22,26 +22,16 @@ class Report extends Model
     ];
 
     protected $casts = [
-        'findings'    => 'json',
-        'report_date' => 'datetime',
-        'generated_at'=> 'datetime',
+        'findings'     => 'json',
+        'report_date'  => 'datetime',
+        'generated_at' => 'datetime',
     ];
 
     // ─── Scopes ───────────────────────────────────────────────────
 
-    public function scopePending($query)
-    {
-        return $query->where('status', 'submitted');
-    }
-
     public function scopeApproved($query)
     {
         return $query->where('status', 'approved');
-    }
-
-    public function scopeDraft($query)
-    {
-        return $query->where('status', 'draft');
     }
 
     // ─── Relationships ────────────────────────────────────────────

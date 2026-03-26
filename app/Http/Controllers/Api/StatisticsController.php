@@ -59,12 +59,6 @@ class StatisticsController extends Controller
     {
         return [
             'total'   => Report::count(),
-            'by_status' => [
-                'draft'     => Report::where('status', 'draft')->count(),
-                'submitted' => Report::where('status', 'submitted')->count(),
-                'approved'  => Report::where('status', 'approved')->count(),
-                'rejected'  => Report::where('status', 'rejected')->count(),
-            ],
             'per_partner' => Report::select('partner_id')
                 ->selectRaw('count(*) as total')
                 ->with('partner:id,name,email')
@@ -82,62 +76,57 @@ class StatisticsController extends Controller
 
  // ... other methods
 
-    private function getGrowthStats()
-    {
-        $isSqlite = \DB::getDriverName() === 'sqlite';
-        
-        // Use strftime for SQLite, MONTH/YEAR for MySQL
-        $monthFunc = $isSqlite ? "strftime('%m', created_at)" : "MONTH(created_at)";
-        $yearFunc  = $isSqlite ? "strftime('%Y', created_at)" : "YEAR(created_at)";
+private function getGrowthStats()
+{
+    $isSqlite = \DB::getDriverName() === 'sqlite';
 
-        return [
-            'users_per_month' => User::selectRaw("{$monthFunc} as month, {$yearFunc} as year, count(*) as total")
-                ->groupBy('year', 'month')
-                ->orderBy('year', 'asc')
-                ->orderBy('month', 'asc')
-                ->get(),
-                
-            'reports_per_month' => Report::selectRaw("{$monthFunc} as month, {$yearFunc} as year, count(*) as total")
-                ->groupBy('year', 'month')
-                ->orderBy('year', 'asc')
-                ->orderBy('month', 'asc')
-                ->get(),
-                
-            'vehicles_per_month' => Vehicle::selectRaw("{$monthFunc} as month, {$yearFunc} as year, count(*) as total")
-                ->groupBy('year', 'month')
-                ->orderBy('year', 'asc')
-                ->orderBy('month', 'asc')
-                ->get(),
-        ];
-    }
+    $monthFunc = $isSqlite ? "strftime('%m', created_at)" : "MONTH(created_at)";
+    $yearFunc  = $isSqlite ? "strftime('%Y', created_at)" : "YEAR(created_at)";
 
-    private function getPaymentStats()
-    {
-        $isSqlite = \DB::getDriverName() === 'sqlite';
-        $monthFunc = $isSqlite ? "strftime('%m', created_at)" : "MONTH(created_at)";
-        $yearFunc  = $isSqlite ? "strftime('%Y', created_at)" : "YEAR(created_at)";
+    return [
+        'users_per_month' => User::selectRaw("{$monthFunc} as month, {$yearFunc} as year, count(*) as total")
+            ->groupByRaw("{$yearFunc}, {$monthFunc}") // ← groupByRaw instead of groupBy
+            ->orderByRaw("{$yearFunc} asc, {$monthFunc} asc")
+            ->get(),
 
-        return [
-            'total_revenue' => Payment::where('status', 'paid')->sum('amount'),
-            'paid_vs_unpaid' => [
-                'paid'    => Payment::where('status', 'paid')->count(),
-                'unpaid'  => Payment::where('status', 'unpaid')->count(),
-                'pending' => Payment::where('status', 'pending')->count(),
-            ],
-            'revenue_per_partner' => Payment::where('status', 'paid')
-                ->select('user_id')
-                ->selectRaw('sum(amount) as total_revenue, count(*) as total_payments')
-                ->with('user:id,name,email')
-                ->groupBy('user_id')
-                ->orderBy('total_revenue', 'desc')
-                ->get(),
-            'revenue_per_month' => Payment::where('status', 'paid')
-                ->selectRaw("{$monthFunc} as month, {$yearFunc} as year, sum(amount) as total_revenue")
-                ->groupBy('year', 'month')
-                ->orderBy('year', 'asc')
-                ->orderBy('month', 'asc')
-                ->get(),
-        ];
-    }
+        'reports_per_month' => Report::selectRaw("{$monthFunc} as month, {$yearFunc} as year, count(*) as total")
+            ->groupByRaw("{$yearFunc}, {$monthFunc}")
+            ->orderByRaw("{$yearFunc} asc, {$monthFunc} asc")
+            ->get(),
+
+        'vehicles_per_month' => Vehicle::selectRaw("{$monthFunc} as month, {$yearFunc} as year, count(*) as total")
+            ->groupByRaw("{$yearFunc}, {$monthFunc}")
+            ->orderByRaw("{$yearFunc} asc, {$monthFunc} asc")
+            ->get(),
+    ];
+}
+
+private function getPaymentStats()
+{
+    $isSqlite = \DB::getDriverName() === 'sqlite';
+    $monthFunc = $isSqlite ? "strftime('%m', created_at)" : "MONTH(created_at)";
+    $yearFunc  = $isSqlite ? "strftime('%Y', created_at)" : "YEAR(created_at)";
+
+    return [
+        'total_revenue' => Payment::where('status', 'paid')->sum('amount'),
+        'paid_vs_unpaid' => [
+            'paid'    => Payment::where('status', 'paid')->count(),
+            'unpaid'  => Payment::where('status', 'unpaid')->count(),
+            'pending' => Payment::where('status', 'pending')->count(),
+        ],
+        'revenue_per_partner' => Payment::where('status', 'paid')
+            ->select('user_id')
+            ->selectRaw('sum(amount) as total_revenue, count(*) as total_payments')
+            ->with('user:id,name,email')
+            ->groupBy('user_id')
+            ->orderBy('total_revenue', 'desc')
+            ->get(),
+        'revenue_per_month' => Payment::where('status', 'paid')
+            ->selectRaw("{$monthFunc} as month, {$yearFunc} as year, sum(amount) as total_revenue")
+            ->groupByRaw("{$yearFunc}, {$monthFunc}") // ← fix here too
+            ->orderByRaw("{$yearFunc} asc, {$monthFunc} asc")
+            ->get(),
+    ];
+}
 }
 

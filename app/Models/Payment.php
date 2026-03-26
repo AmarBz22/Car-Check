@@ -57,12 +57,16 @@ class Payment extends Model
     /**
      * Scope: find a valid paid + non-expired payment for user + vehicle
      */
-    public function scopeActiveAccessFor($query, int $userId, int $vehicleId)
-    {
-        return $query
-            ->where('user_id', $userId)
-            ->where('vehicle_id', $vehicleId)
-            ->where('status', 'paid')
-            ->where('expires_at', '>', now());
-    }
+// app/Models/Payment.php
+public function scopeActiveAccessFor($query, $userId, $vehicleId)
+{
+    return $query
+        ->where('user_id', $userId)
+        ->where('vehicle_id', $vehicleId)
+        ->where('status', 'paid')
+        ->where(function ($q) {
+            $q->whereNull('expires_at')        // null = never expires
+              ->orWhere('expires_at', '>', now()); // or not yet expired
+        });
+}
 }

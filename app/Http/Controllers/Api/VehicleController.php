@@ -93,13 +93,31 @@ public function store(Request $request)
         'model'        => 'required|string',
         'year'         => 'required|digits:4',
         'color'        => 'nullable|string',
+        'images'       => 'nullable|array|max:10',
+        'images.*'     => 'image|mimes:jpg,jpeg,png,webp|max:2048',
     ]);
 
     $data['user_id'] = auth()->id();
 
     $vehicle = Vehicle::create($data);
 
-    return response()->json($vehicle, 201);
+    // Handle images if provided
+    $savedImages = [];
+    if ($request->hasFile('images')) {
+        foreach ($request->file('images') as $index => $image) {
+            $path = $image->store('vehicles', 'public');
+
+            $savedImages[] = $vehicle->images()->create([
+                'image_path' => $path,
+                'is_primary' => $index === 0, // first image is primary
+            ]);
+        }
+    }
+
+    return response()->json([
+        'message' => 'Vehicle created successfully',
+        'vehicle' => $vehicle->load('images'),
+    ], 201);
 }
 
     /**

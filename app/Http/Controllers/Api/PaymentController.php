@@ -288,5 +288,23 @@ public function show(Payment $payment)
         'has_access' => $payment->hasActiveAccess(),
     ]);
 }
+
+public function checkAccess(Request $request, Vehicle $vehicle)
+{
+    // Not logged in — no access
+    if (!$request->user()) {
+        return response()->json([
+            'has_access' => false,
+            'expires_at' => null,
+        ]);
+    }
+
+    $existing = Payment::activeAccessFor($request->user()->id, $vehicle->id)->first();
+
+    return response()->json([
+        'has_access' => (bool) $existing,
+        'expires_at' => $existing?->expires_at,
+    ]);
+}
 }
 

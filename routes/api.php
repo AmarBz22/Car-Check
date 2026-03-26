@@ -81,6 +81,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/{id}', [ReportController::class, 'show']);
 });
 
+Route::get('/vehicles/{vehicleId}/reports', [ReportController::class, 'getVehicleReports'])->middleware('auth:sanctum');
+
 // Admin Reports Management Routes
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('/admin/reports/pending', [ReportController::class, 'getPendingReports']);
@@ -116,6 +118,8 @@ Route::get('/payments/back',               [PaymentController::class, 'paymentBa
 Route::post('/payments/webhook', [PaymentController::class, 'webhook'])
     ->withoutMiddleware(['auth:sanctum', 'csrf'])
     ->name('payment.webhook');
+
+Route::get('/payments/access/{vehicle}', [PaymentController::class, 'checkAccess'])->middleware('auth:sanctum');
 
 
 Route::middleware('auth:sanctum')->group(function () {
