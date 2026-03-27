@@ -83,6 +83,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::get('/vehicles/{vehicleId}/reports', [ReportController::class, 'getVehicleReports'])->middleware('auth:sanctum');
 
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/reports/{reportId}/download-pdf', [ReportController::class, 'downloadPdf']);
+});
+
 // Admin Reports Management Routes
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('/admin/reports/pending', [ReportController::class, 'getPendingReports']);
